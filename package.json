@@ -1,0 +1,73 @@
+{
+  "bugs": {
+    "url": "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/issues"
+  },
+  "description": "...",
+  "devDependencies": {
+    "@evilmartians/lefthook": "^1.9.0",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.4",
+    "@semantic-release/npm": "^12.0.2",
+    "@semantic-release/release-notes-generator": "^14.0.3",
+    "@types/node": "^22.5.1",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
+    "@typescript-eslint/parser": "^8.39.1",
+    "@vitest/coverage-v8": "^2.0.5",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsonc": "^2.20.1",
+    "globals": "^16.3.0",
+    "prettier": "^3.3.3",
+    "prettier-plugin-organize-imports": "^4.2.0",
+    "semantic-release": "^24.2.7",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.4",
+    "typedoc": "^0.27.2",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.39.1",
+    "vitest": "^2.0.5"
+  },
+  "files": [
+    "dist"
+  ],
+  "homepage": "https://www.npmjs.com/package/@$GITHUB_OWNER/$GITHUB_REPO",
+  "keywords": [],
+  "license": "UNLICENSED",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "name": "@$GITHUB_OWNER/$GITHUB_REPO",
+  "private": false,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/$GITHUB_OWNER/$GITHUB_REPO.git"
+  },
+  "scripts": {
+    "build": "tsup",
+    "check": "bun run check:format && bun run check:lint",
+    "check:format": "prettier --check .",
+    "check:lint": "eslint .",
+    "clean": "rm -rf dist docs",
+    "dist": "bun run clean && bun run build",
+    "docs": "typedoc",
+    "fix": "bun run fix:format && bun run fix:lint",
+    "fix:format": "prettier --write .",
+    "fix:lint": "eslint . --fix",
+    "release": "semantic-release",
+    "test": "bun run test:type && bun run test:unit",
+    "test:type": "tsc",
+    "test:unit": "vitest run --passWithNoTests"
+  },
+  "type": "module",
+  "version": "0.0.0",
+  "packageManager": "bun@1.1.34"
+}
