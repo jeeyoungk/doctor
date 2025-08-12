@@ -1,1 +1,1 @@
-export * from "./MyClass.js";
+export * from "./doctor.js";
