@@ -1,6 +1,6 @@
 {
   "bugs": {
-    "url": "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/issues"
+    "url": "https://github.com/jeeyoungk/doctor/issues"
   },
   "description": "...",
   "devDependencies": {
@@ -32,7 +32,7 @@
   "files": [
     "dist"
   ],
-  "homepage": "https://www.npmjs.com/package/@$GITHUB_OWNER/$GITHUB_REPO",
+  "homepage": "https://www.npmjs.com/package/@jeeyoungk/doctor",
   "keywords": [],
   "license": "UNLICENSED",
   "main": "./dist/index.cjs",
@@ -45,11 +45,11 @@
       "require": "./dist/index.cjs"
     }
   },
-  "name": "@$GITHUB_OWNER/$GITHUB_REPO",
+  "name": "@jeeyoungk/doctor",
   "private": false,
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/$GITHUB_OWNER/$GITHUB_REPO.git"
+    "url": "git+https://github.com/jeeyoungk/doctor.git"
   },
   "scripts": {
     "build": "tsup",
