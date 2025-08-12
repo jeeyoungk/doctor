@@ -1,3 +1,11 @@
+# 1.0.0 (2025-08-12)
+
+
+### Bug Fixes
+
+* re-enable release ([846bb70](https://github.com/jeeyoungk/doctor/commit/846bb7088be94695111f682859298cbeac7b946f))
+* release has the correct permissions ([8a04762](https://github.com/jeeyoungk/doctor/commit/8a0476299fdea417d8a0f705f26122d6c624d332))
+
 ### 0.3.0 (2023-11-21)
 
 ### 0.2.0 (2023-11-21)
