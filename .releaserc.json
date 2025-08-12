@@ -22,7 +22,10 @@
       "@semantic-release/npm",
       {
         "npmPublish": true,
-        "access": "public"
+        "access": "public",
+        "publishConfig": {
+          "access": "public"
+        }
       }
     ],
     "@semantic-release/github",

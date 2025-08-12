@@ -48,6 +48,9 @@
   },
   "name": "@jeeyoungk/doctor",
   "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/jeeyoungk/doctor.git"
