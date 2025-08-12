@@ -18,7 +18,13 @@
     ],
     "@semantic-release/release-notes-generator",
     "@semantic-release/changelog",
-    "@semantic-release/npm",
+    [
+      "@semantic-release/npm",
+      {
+        "npmPublish": true,
+        "access": "public"
+      }
+    ],
     "@semantic-release/github",
     [
       "@semantic-release/git",
