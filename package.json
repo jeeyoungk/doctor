@@ -9,6 +9,7 @@
     "zx": "^8.8.0"
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
     "@evilmartians/lefthook": "^1.9.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/commit-analyzer": "^13.0.1",
@@ -45,13 +46,18 @@
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "doctor": "./dist/cli.js"
+    "doctor": "./dist/doctor.js"
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     }
   },
   "name": "@jeeyoungk/doctor",
@@ -65,7 +71,8 @@
   },
   "scripts": {
     "build": "tsup",
-    "check": "bun run check:format && bun run check:lint",
+    "check": "bun run check:format && bun run check:lint && bun run check:attw",
+    "check:attw": "attw --pack .",
     "check:format": "prettier --check .",
     "check:lint": "eslint .",
     "clean": "rm -rf dist docs",

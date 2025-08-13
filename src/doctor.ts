@@ -64,7 +64,7 @@ export class EnvChecker {
       const versionFlag = checker.versionFlag ?? "--version";
 
       // Configure zx to be quiet and not throw on non-zero exit codes
-      $.verbose = true;
+      $.verbose = false;
       const result = await $`${checker.command} ${versionFlag}`.nothrow();
 
       const output = result.stdout || result.stderr;
@@ -221,6 +221,14 @@ export const commonCheckers: BinaryChecker[] = [
     command: "python3",
     parseVersion: (output: string) => {
       const match = output.match(/Python (\d+\.\d+\.\d+)/);
+      return match?.[1] ?? null;
+    },
+  },
+  {
+    name: "bun",
+    command: "bun",
+    parseVersion: (output: string) => {
+      const match = output.match(/(\d+\.\d+\.\d+)/);
       return match?.[1] ?? null;
     },
   },

@@ -1,115 +1,119 @@
+import { Command } from "commander";
+import { access, readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 import { createEnvChecker, type VersionRequirement } from "./doctor.js";
 
-function showHelp() {
-  console.log(`🩺 Doctor - Environment Checker
+const program = new Command();
 
-Usage:
-  doctor [command] [options]
+program
+  .name("doctor")
+  .description("🩺 Doctor - Environment Checker")
+  .version("1.0.0")
+  .argument("[config]", "Configuration file (JSON, JS, or ESM module)")
+  .action(async (configFile?: string) => {
+    await runVerify(configFile);
+  });
 
-Commands:
-  check <binary>           Check if a binary is available
-  version <binary>         Get version of a binary
-  verify <requirements>    Verify requirements from JSON string
-  help                     Show this help message
-
-Examples:
-  doctor check node
-  doctor version npm
-  doctor verify '{"node":{"operator":">=","version":"18.0.0"}}'
-`);
-}
-
-async function main() {
-  const args = process.argv.slice(2);
-
-  if (args.length === 0 || args[0] === "help") {
-    showHelp();
-    return;
-  }
-
-  const checker = createEnvChecker();
-  const command = args[0];
-
-  try {
-    switch (command) {
-      case "check": {
-        const binary = args[1];
-        if (!binary) {
-          console.error("❌ Binary name required");
-          process.exit(1);
-        }
-
+async function loadRequirements(input: string): Promise<Record<string, VersionRequirement>> {
+  // Check if input looks like a file path
+  if (
+    input.includes("/") ||
+    input.includes("\\") ||
+    input.endsWith(".json") ||
+    input.endsWith(".js") ||
+    input.endsWith(".mjs")
+  ) {
+    try {
+      if (input.endsWith(".json")) {
+        // Load JSON file
+        const content = await readFile(input, "utf-8");
+        return JSON.parse(content);
+      } else if (input.endsWith(".js") || input.endsWith(".mjs")) {
+        // Load JS/ESM module
+        const fileUrl = pathToFileURL(input).href;
+        const module = await import(fileUrl);
+        return module.default;
+      } else {
+        // Try to determine file type by reading
+        const content = await readFile(input, "utf-8");
         try {
-          const version = await checker.getCurrentVersion(binary);
-          console.log(`✅ ${binary}: ${version}`);
+          return JSON.parse(content);
         } catch {
-          console.log(`❌ ${binary}: not found`);
-          process.exit(1);
+          // If JSON parsing fails, treat as JS file
+          const fileUrl = pathToFileURL(input).href;
+          const module = await import(fileUrl);
+          return module.default;
         }
-        break;
       }
-
-      case "version": {
-        const binary = args[1];
-        if (!binary) {
-          console.error("❌ Binary name required");
-          process.exit(1);
-        }
-
-        try {
-          const version = await checker.getCurrentVersion(binary);
-          console.log(version);
-        } catch {
-          console.error(`❌ Failed to get version for ${binary}`);
-          process.exit(1);
-        }
-        break;
-      }
-
-      case "verify": {
-        const requirementsJson = args[1];
-        if (!requirementsJson) {
-          console.error("❌ Requirements JSON required");
-          process.exit(1);
-        }
-
-        try {
-          const requirements: Record<string, VersionRequirement> = JSON.parse(requirementsJson);
-          const results = await checker.checkMultiple(requirements);
-
-          let hasFailure = false;
-          results.forEach((result) => {
-            const status = result.satisfies ? "✅" : "❌";
-            const version = result.currentVersion || "not found";
-            console.log(`${status} ${result.binary}: ${version}`);
-
-            if (!result.satisfies) {
-              hasFailure = true;
-            }
-          });
-
-          if (hasFailure) {
-            process.exit(1);
-          }
-        } catch (error) {
-          console.error(`❌ Failed to parse requirements: ${error}`);
-          process.exit(1);
-        }
-        break;
-      }
-
-      default:
-        console.error(`❌ Unknown command: ${command}`);
-        showHelp();
-        process.exit(1);
+    } catch (error) {
+      throw new Error(`Failed to load requirements from file: ${error}`);
     }
-  } catch (error) {
-    console.error(`❌ Error: ${error}`);
-    process.exit(1);
+  } else {
+    // Treat as JSON string
+    return JSON.parse(input);
   }
 }
 
-main().catch((error) => {
-  console.error(`❌ Unexpected error: ${error}`);
-  process.exit(1);
-});
+async function findConfigFile(): Promise<string | null> {
+  const configFiles = ["doctor.config.js", "doctor.config.mjs", "doctor.config.json"];
+
+  for (const file of configFiles) {
+    try {
+      await access(file);
+      return file;
+    } catch {
+      // File doesn't exist, continue
+    }
+  }
+  return null;
+}
+
+async function runVerify(configFile?: string) {
+  const checker = createEnvChecker();
+
+  // If no config file provided, try to find one
+  if (!configFile) {
+    configFile = (await findConfigFile()) ?? undefined;
+  }
+
+  if (configFile) {
+    console.log(`🩺 Found config file: ${configFile}`);
+
+    try {
+      const requirements = await loadRequirements(configFile);
+      const results = await checker.checkMultiple(requirements);
+
+      let hasFailure = false;
+      results.forEach((result) => {
+        const status = result.satisfies ? "✅" : "❌";
+        const version = result.currentVersion || "not found";
+        console.log(`${status} ${result.binary}: ${version}`);
+
+        if (!result.satisfies) {
+          hasFailure = true;
+        }
+      });
+
+      if (hasFailure) {
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error(`❌ Failed to load or parse requirements: ${error}`);
+      process.exit(1);
+    }
+  } else {
+    console.log("🩺 Doctor - Environment Checker");
+    console.log("\nNo config file found. Usage:");
+    console.log("  doctor [config-file]     - Verify requirements from config file");
+    console.log("  doctor --help           - Show detailed help");
+    console.log("\nSupported config files:");
+    console.log("  doctor.config.js/mjs/json");
+    console.log("\nExample config (doctor.config.js):");
+    console.log("  export default {");
+    console.log('    node: { operator: ">=", version: "18.0.0" },');
+    console.log('    npm: { operator: ">=", version: "8.0.0" }');
+    console.log("  };");
+  }
+}
+
+program.parse();

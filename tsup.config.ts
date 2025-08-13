@@ -5,7 +5,9 @@ export default defineConfig([
   {
     entry: ["src/index.ts"],
     format: ["cjs", "esm"],
-    dts: true,
+    dts: {
+      resolve: true,
+    },
     clean: true,
     splitting: false,
     sourcemap: true,
@@ -15,7 +17,7 @@ export default defineConfig([
   },
   // CLI executable build
   {
-    entry: ["src/main.ts"],
+    entry: { doctor: "src/main.ts" },
     format: ["esm"],
     outDir: "dist",
     banner: {
@@ -23,8 +25,7 @@ export default defineConfig([
     },
     clean: false,
     target: "es2022",
-    name: "cli",
-    platform: "neutral",
-    onSuccess: "chmod +x dist/main.js",
+    platform: "node",
+    onSuccess: "chmod +x dist/doctor.js",
   },
 ]);
