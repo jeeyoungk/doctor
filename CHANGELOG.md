@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/jeeyoungk/doctor/compare/v1.0.0...v1.0.1) (2025-08-13)
+
+
+### Features
+
+* binary entry point ([e49f9b5](https://github.com/jeeyoungk/doctor/commit/e49f9b5470ad796beae964d5eb35823e7f8cfa9a))
+
 # 1.0.0 (2025-08-12)
 
 ### Bug Fixes
