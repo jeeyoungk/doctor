@@ -44,7 +44,7 @@ export class EnvChecker {
       const versionFlag = checker.versionFlag ?? "--version";
 
       // Configure zx to be quiet and not throw on non-zero exit codes
-      $.verbose = true;
+      $.verbose = false;
       const result = await $`${checker.command} ${versionFlag}`.nothrow();
 
       const output = result.stdout || result.stderr;
