@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env bun run
 
 import { createEnvChecker, type BinaryChecker, type VersionRequirement } from "./doctor.js";
 
@@ -13,6 +13,7 @@ async function main() {
     node: { operator: ">=", version: "18.0.0" },
     npm: { operator: ">=", version: "8.0.0" },
     git: { operator: ">=", version: "2.0.0" },
+    docker: { operator: ">=", version: "20.0.0" },
   };
 
   // Test different semver operators
@@ -40,6 +41,13 @@ async function main() {
     const error = result.error ? ` (${result.error})` : "";
 
     console.log(`${status} ${result.binary}: ${version}${error}`);
+
+    // Display components if available
+    if (result.components) {
+      Object.entries(result.components).forEach(([component, componentVersion]) => {
+        console.log(`  └─ ${component}: ${componentVersion}`);
+      });
+    }
   });
 
   // Test individual binary checks

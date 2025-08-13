@@ -6,17 +6,20 @@ export interface VersionRequirement {
   version: string;
 }
 
+/** Interface for checking the version of a binary */
 export interface BinaryChecker {
   name: string;
   command: string;
-  versionFlag?: string;
+  versionFlag?: string | string[];
   parseVersion: (output: string) => string | null;
+  parseComponents?: (output: string) => Record<string, string> | null;
 }
 
 export interface VersionCheckResult {
   binary: string;
   currentVersion: string | null;
   satisfies: boolean;
+  components?: Record<string, string>;
   error?: string;
 }
 
@@ -41,11 +44,31 @@ export class EnvChecker {
       const versionFlag = checker.versionFlag ?? "--version";
 
       // Configure zx to be quiet and not throw on non-zero exit codes
-      $.verbose = false;
+      $.verbose = true;
       const result = await $`${checker.command} ${versionFlag}`.nothrow();
 
       const output = result.stdout || result.stderr;
       return checker.parseVersion(output.trim());
+    } catch {
+      return null;
+    }
+  }
+
+  async getComponents(binaryName: string): Promise<Record<string, string> | null> {
+    const checker = this.checkers.get(binaryName);
+    if (!checker?.parseComponents) {
+      return null;
+    }
+
+    try {
+      const versionFlag = checker.versionFlag ?? "--version";
+
+      // Configure zx to be quiet and not throw on non-zero exit codes
+      $.verbose = true;
+      const result = await $`${checker.command} ${versionFlag}`.nothrow();
+
+      const output = result.stdout || result.stderr;
+      return checker.parseComponents(output.trim());
     } catch {
       return null;
     }
@@ -65,11 +88,13 @@ export class EnvChecker {
       }
 
       const satisfies = this.satisfiesRequirement(currentVersion, requirement);
+      const components = await this.getComponents(binaryName);
 
       return {
         binary: binaryName,
         currentVersion,
         satisfies,
+        ...(components && { components }),
       };
     } catch (error) {
       return {
@@ -144,9 +169,43 @@ export const commonCheckers: BinaryChecker[] = [
   {
     name: "docker",
     command: "docker",
+    versionFlag: ["version", "-f", "json"],
     parseVersion: (output: string) => {
-      const match = output.match(/Docker version (\d+\.\d+\.\d+)/);
-      return match?.[1] ?? null;
+      try {
+        const json = JSON.parse(output);
+        return json.Client?.Version ?? null;
+      } catch {
+        return null;
+      }
+    },
+    parseComponents: (output: string) => {
+      try {
+        const json = JSON.parse(output);
+        const components: Record<string, string> = {};
+
+        // Add Client version
+        if (json.Client?.Version) {
+          components["Client"] = json.Client.Version;
+        }
+
+        // Add Server version
+        if (json.Server?.Version) {
+          components["Server"] = json.Server.Version;
+        }
+
+        // Add Server components
+        if (json.Server?.Components) {
+          json.Server.Components.forEach((comp: { Name?: string; Version?: string }) => {
+            if (comp.Name && comp.Version) {
+              components[comp.Name] = comp.Version;
+            }
+          });
+        }
+
+        return Object.keys(components).length > 0 ? components : null;
+      } catch {
+        return null;
+      }
     },
   },
   {
