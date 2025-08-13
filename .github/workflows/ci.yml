@@ -38,9 +38,6 @@ jobs:
       - name: "Build"
         if: steps.install.conclusion == 'success'
         run: bun run build
-      - name: "Run Documentation"
-        if: steps.install.conclusion == 'success'
-        run: bun run docs
 
   release:
     needs: test

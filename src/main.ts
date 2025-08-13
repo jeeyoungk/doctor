@@ -1,10 +1,9 @@
 import { Command } from "commander";
 import { access, readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
-import packageJson from "../package.json" with { type: "json" };
+import { version } from "../package.json";
 import { createEnvChecker, type VersionRequirement } from "./doctor.js";
 
-const version = packageJson.version;
 const program = new Command();
 
 program
