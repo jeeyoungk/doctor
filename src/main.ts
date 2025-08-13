@@ -1,14 +1,16 @@
 import { Command } from "commander";
 import { access, readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
+import packageJson from "../package.json" with { type: "json" };
 import { createEnvChecker, type VersionRequirement } from "./doctor.js";
 
+const version = packageJson.version;
 const program = new Command();
 
 program
   .name("doctor")
   .description("🩺 Doctor - Environment Checker")
-  .version("1.0.0")
+  .version(version)
   .argument("[config]", "Configuration file (JSON, JS, or ESM module)")
   .action(async (configFile?: string) => {
     await runVerify(configFile);
