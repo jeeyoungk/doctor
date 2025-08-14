@@ -1,10 +1,22 @@
 import semver from "semver";
+import { z } from "zod";
 import { $ } from "zx";
 
-export interface VersionRequirement {
-  operator: "=" | ">=" | "<=" | ">" | "<" | "^" | "~";
-  version: string;
+/** Top level config definition for the doctor CLI. */
+export interface Config {
+  checkers?: BinaryChecker[];
+  requirements?: Record<string, VersionRequirement>;
 }
+export type VersionRequirement =
+  | string // Comma-separated string like ">= 20.0.0, < 22"
+  | {
+      operator: "=" | ">=" | "<=" | ">" | "<" | "^" | "~";
+      version: string;
+    }
+  | {
+      operator: "=" | ">=" | "<=" | ">" | "<" | "^" | "~";
+      version: string;
+    }[];
 
 /** Interface for checking the version of a binary */
 export interface BinaryChecker {
@@ -21,7 +33,42 @@ export interface VersionCheckResult {
   satisfies: boolean;
   components?: Record<string, string>;
   error?: string;
+  failedConstraints?: string[];
+  satisfiedConstraints?: string[];
 }
+
+interface RequirementCheckResult {
+  satisfies: boolean;
+  failedConstraints: string[];
+  satisfiedConstraints: string[];
+}
+
+// Zod schemas for runtime validation
+const versionOperatorSchema = z.enum(["=", ">=", "<=", ">", "<", "^", "~"]);
+
+const versionRequirementObjectSchema = z.object({
+  operator: versionOperatorSchema,
+  version: z.string(),
+});
+
+export const versionRequirementSchema = z.union([
+  z.string(), // Comma-separated string like ">= 20.0.0, < 22"
+  versionRequirementObjectSchema,
+  z.array(versionRequirementObjectSchema),
+]);
+
+export const binaryCheckerSchema = z.object({
+  name: z.string(),
+  command: z.string(),
+  versionFlag: z.union([z.string(), z.array(z.string())]).optional(),
+  parseVersion: z.any(), // Function validation is complex in Zod v4, using any for now
+  parseComponents: z.any().optional(), // Function validation is complex in Zod v4, using any for now
+});
+
+export const configSchema = z.object({
+  checkers: z.array(binaryCheckerSchema).optional(),
+  requirements: z.record(z.string(), versionRequirementSchema).optional(),
+});
 
 export class EnvChecker {
   private checkers: Map<string, BinaryChecker> = new Map();
@@ -87,14 +134,20 @@ export class EnvChecker {
         };
       }
 
-      const satisfies = this.satisfiesRequirement(currentVersion, requirement);
+      const requirementResult = this.satisfiesRequirement(currentVersion, requirement);
       const components = await this.getComponents(binaryName);
 
       return {
         binary: binaryName,
         currentVersion,
-        satisfies,
+        satisfies: requirementResult.satisfies,
         ...(components && { components }),
+        ...(requirementResult.failedConstraints.length > 0 && {
+          failedConstraints: requirementResult.failedConstraints,
+        }),
+        ...(requirementResult.satisfiedConstraints.length > 0 && {
+          satisfiedConstraints: requirementResult.satisfiedConstraints,
+        }),
       };
     } catch (error) {
       return {
@@ -113,22 +166,103 @@ export class EnvChecker {
     return results;
   }
 
-  private satisfiesRequirement(currentVersion: string, requirement: VersionRequirement): boolean {
-    try {
-      // Clean and validate versions
-      const cleanCurrent = semver.clean(currentVersion);
-      const cleanRequired = semver.clean(requirement.version);
+  private parseStringRequirement(requirement: string): Array<{ operator: string; version: string }> {
+    const parts = requirement.split(",").map((part) => part.trim());
+    const parsed: Array<{ operator: string; version: string }> = [];
 
-      if (!cleanCurrent || !cleanRequired) {
-        return false;
+    for (const part of parts) {
+      const match = part.match(/^(>=|<=|>|<|=|\^|~)\s*(.+)$/);
+      if (match && match[1] && match[2]) {
+        parsed.push({ operator: match[1], version: match[2].trim() });
+      }
+    }
+
+    return parsed;
+  }
+
+  private satisfiesRequirement(currentVersion: string, requirement: VersionRequirement): RequirementCheckResult {
+    try {
+      const cleanCurrent = semver.clean(currentVersion);
+      if (!cleanCurrent) {
+        return {
+          satisfies: false,
+          failedConstraints: ["Invalid current version format"],
+          satisfiedConstraints: [],
+        };
       }
 
-      // Build the range string based on operator
-      const range = `${requirement.operator}${cleanRequired}`;
+      const failedConstraints: string[] = [];
+      const satisfiedConstraints: string[] = [];
 
-      return semver.satisfies(cleanCurrent, range);
+      // Handle string requirement (comma-separated)
+      if (typeof requirement === "string") {
+        const parsedRequirements = this.parseStringRequirement(requirement);
+        for (const req of parsedRequirements) {
+          const cleanRequired = semver.clean(req.version);
+          if (!cleanRequired) {
+            failedConstraints.push(`Invalid version format: ${req.operator}${req.version}`);
+            continue;
+          }
+          const range = `${req.operator}${cleanRequired}`;
+          if (!semver.satisfies(cleanCurrent, range)) {
+            failedConstraints.push(`${req.operator}${cleanRequired}`);
+          } else {
+            satisfiedConstraints.push(`${req.operator}${cleanRequired}`);
+          }
+        }
+        return {
+          satisfies: failedConstraints.length === 0,
+          failedConstraints,
+          satisfiedConstraints,
+        };
+      }
+
+      // Handle array of requirements
+      if (Array.isArray(requirement)) {
+        for (const req of requirement) {
+          const cleanRequired = semver.clean(req.version);
+          if (!cleanRequired) {
+            failedConstraints.push(`Invalid version format: ${req.operator}${req.version}`);
+            continue;
+          }
+          const range = `${req.operator}${cleanRequired}`;
+          if (!semver.satisfies(cleanCurrent, range)) {
+            failedConstraints.push(`${req.operator}${cleanRequired}`);
+          } else {
+            satisfiedConstraints.push(`${req.operator}${cleanRequired}`);
+          }
+        }
+        return {
+          satisfies: failedConstraints.length === 0,
+          failedConstraints,
+          satisfiedConstraints,
+        };
+      }
+
+      // Handle single object requirement
+      const cleanRequired = semver.clean(requirement.version);
+      if (!cleanRequired) {
+        return {
+          satisfies: false,
+          failedConstraints: [`Invalid version format: ${requirement.operator}${requirement.version}`],
+          satisfiedConstraints: [],
+        };
+      }
+
+      const range = `${requirement.operator}${cleanRequired}`;
+      const satisfies = semver.satisfies(cleanCurrent, range);
+      if (!satisfies) {
+        failedConstraints.push(`${requirement.operator}${cleanRequired}`);
+      } else {
+        satisfiedConstraints.push(`${requirement.operator}${cleanRequired}`);
+      }
+      return { satisfies, failedConstraints, satisfiedConstraints };
     } catch {
-      return false;
+      return {
+        satisfies: false,
+        failedConstraints: ["Error processing version requirement"],
+        satisfiedConstraints: [],
+      };
     }
   }
 }
