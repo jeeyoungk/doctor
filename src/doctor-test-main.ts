@@ -1,6 +1,7 @@
 #!/usr/bin/env bun run
 
-import { createEnvChecker, type BinaryChecker, type VersionRequirement } from "./doctor.js";
+import type { BinaryChecker } from "./config.js";
+import { createEnvChecker, type VersionRequirement } from "./doctor.js";
 
 function formatRequirement(req: VersionRequirement): string {
   if (typeof req === "string") {
@@ -98,15 +99,13 @@ async function main() {
   // Test with a custom checker
   console.log("\nTesting custom checker (bun):");
   const bunChecker: BinaryChecker = {
-    name: "bun",
-    command: "bun",
     parseVersion: (output: string) => {
       const match = output.match(/(\d+\.\d+\.\d+)/);
       return match?.[1] ?? null;
     },
   };
 
-  checker.addChecker(bunChecker);
+  checker.addChecker("bun", bunChecker);
 
   try {
     const bunResult = await checker.checkVersion("bun", { operator: ">=", version: "1.0.0" });

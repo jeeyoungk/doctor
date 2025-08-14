@@ -1,20 +1,18 @@
 // Sample configuration for doctor CLI
 // Usage: doctor [doctor.config.js]
 
-/** @type {import("./src/doctor.ts").Config} */
+/** @type {import("./src/config.ts").Config} */
 export default {
   // Optional: Custom binary checkers (extends the built-in common checkers)
-  checkers: [
+  checkers: {
     // Example custom checker for TypeScript compiler
-    {
-      name: "tsc",
-      command: "tsc",
+    tsc: {
       parseVersion: (output) => {
         const match = output.match(/Version (\d+\.\d+\.\d+)/);
         return match?.[1] ?? null;
       },
     },
-  ],
+  },
 
   // Version requirements for binaries
   requirements: {

@@ -1,8 +1,9 @@
 import { Command } from "commander";
-import { access, readFile } from "node:fs/promises";
+import { access } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { version } from "../package.json";
-import { configSchema, createEnvChecker, type BinaryChecker, type Config, type VersionRequirement } from "./doctor.js";
+import { configSchema, type Config } from "./config.js";
+import { createEnvChecker } from "./doctor.js";
 
 const program = new Command();
 
@@ -17,46 +18,32 @@ program
 
 async function loadConfig(input: string): Promise<Config> {
   // Check if input looks like a file path
-  if (
-    input.includes("/") ||
-    input.includes("\\") ||
-    input.endsWith(".json") ||
-    input.endsWith(".js") ||
-    input.endsWith(".mjs")
-  ) {
+  if (input.includes("/") || input.includes("\\") || input.endsWith(".js") || input.endsWith(".mjs")) {
     try {
-      if (input.endsWith(".json")) {
-        // Load JSON file
-        const content = await readFile(input, "utf-8");
-        return JSON.parse(content);
-      } else if (input.endsWith(".js") || input.endsWith(".mjs")) {
-        // Load JS/ESM module
-        const fileUrl = pathToFileURL(input).href;
-        const module = await import(fileUrl);
-        return module.default;
-      } else {
-        // Try to determine file type by reading
-        const content = await readFile(input, "utf-8");
-        try {
-          return JSON.parse(content);
-        } catch {
-          // If JSON parsing fails, treat as JS file
-          const fileUrl = pathToFileURL(input).href;
-          const module = await import(fileUrl);
-          return module.default;
-        }
+      // Load as ESM module (both .js and .mjs are treated as ESM)
+      const fileUrl = pathToFileURL(input).href;
+      const module = await import(fileUrl);
+
+      // Validate config with Zod schema
+      const parseResult = configSchema.safeParse(module.default);
+      if (!parseResult.success) {
+        const errorMessages = parseResult.error.issues
+          .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+          .join("\n  ");
+        throw new Error(`Invalid config format:\n  ${errorMessages}`);
       }
+
+      return parseResult.data as Config;
     } catch (error) {
       throw new Error(`Failed to load config from file: ${error}`);
     }
   } else {
-    // Treat as JSON string
-    return JSON.parse(input);
+    throw new Error("Config must be a file path to a .js or .mjs file");
   }
 }
 
 async function findConfigFile(): Promise<string | null> {
-  const configFiles = ["doctor.config.js", "doctor.config.mjs", "doctor.config.json"];
+  const configFiles = ["doctor.config.js", "doctor.config.mjs"];
 
   for (const file of configFiles) {
     try {
@@ -79,25 +66,13 @@ async function runVerify(configFile?: string) {
     console.log(`🩺 Found config file: ${configFile}`);
 
     try {
-      const rawConfig = await loadConfig(configFile);
-
-      // Validate config with Zod schema
-      const parseResult = configSchema.safeParse(rawConfig);
-      if (!parseResult.success) {
-        console.error(`❌ Invalid config file format:`);
-        parseResult.error.issues.forEach((issue) => {
-          console.error(`  • ${issue.path.join(".")}: ${issue.message}`);
-        });
-        process.exit(1);
-      }
-
-      const config = parseResult.data;
+      const config = await loadConfig(configFile);
 
       // Create checker with additional checkers from config
-      const checker = createEnvChecker((config.checkers as BinaryChecker[]) || []);
+      const checker = createEnvChecker(config.checkers || {});
 
       // Use requirements from config, or fall back to treating the entire config as requirements for backwards compatibility
-      const requirements = config.requirements || (config as Record<string, VersionRequirement>);
+      const requirements = config.requirements || {};
       const results = await checker.checkMultiple(requirements);
 
       let hasFailure = false;
@@ -105,8 +80,9 @@ async function runVerify(configFile?: string) {
         const status = result.satisfies ? "✅" : "❌";
         const version = result.currentVersion || "not found";
         const error = result.error ? ` (${result.error})` : "";
+        const path = result.fullPath && result.fullPath !== result.binary ? ` (${result.fullPath})` : "";
 
-        console.log(`${status} ${result.binary}: ${version}${error}`);
+        console.log(`${status} ${result.binary}: ${version}${error}${path}`);
 
         // Display satisfied constraints for successful matches
         if (result.satisfies && result.satisfiedConstraints && result.satisfiedConstraints.length > 0) {
@@ -145,20 +121,18 @@ No config file found. Usage:
   doctor --help           - Show detailed help
 
 Supported config files:
-  doctor.config.js/mjs/json
+  doctor.config.js/mjs (ESM modules)
 
 Example config (doctor.config.js):
   export default {
-    checkers: [
-      {
-        name: "tsc",
-        command: "tsc",
+    checkers: {
+      tsc: {
         parseVersion: (output) => {
           const match = output.match(/Version (\\d+\\.\\d+\\.\\d+)/);
           return match?.[1] ?? null;
         }
       }
-    ],
+    },
     requirements: {
       node: { operator: ">=", version: "18.0.0" },
       npm: { operator: ">=", version: "8.0.0" }
