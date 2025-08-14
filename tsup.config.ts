@@ -1,5 +1,16 @@
 import { defineConfig } from "tsup";
 
+/**
+ * Node 18 (which is the engine version we're using) supports ES2023
+ */
+const target = "es2023";
+const outDir = "dist";
+const common = {
+  target,
+  outDir,
+  platform: "node",
+} as const;
+
 export default defineConfig([
   // Library build
   {
@@ -12,20 +23,14 @@ export default defineConfig([
     splitting: false,
     sourcemap: true,
     minify: false,
-    target: "es2022",
-    outDir: "dist",
+    ...common,
   },
   // CLI executable build
   {
     entry: { doctor: "src/main.ts" },
     format: ["esm"],
-    outDir: "dist",
-    banner: {
-      js: "#!/usr/bin/env node",
-    },
-    clean: false,
-    target: "es2022",
-    platform: "node",
+    banner: { js: "#!/usr/bin/env node" },
     onSuccess: "chmod +x dist/doctor.js",
+    ...common,
   },
 ]);
